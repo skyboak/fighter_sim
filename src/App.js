@@ -1,12 +1,9 @@
 import React from 'react';
 import './App.css';
-
+import GauntletMatch from './gauntletMatch';
 function App() {
   return (
-    <div className="App">
-      <h1>WWE Fighter Sim</h1>
-      <p>Championship Mode - Coming Soon!</p>
-    </div>
+    <GauntletMatch></GauntletMatch>
   );
 }
 

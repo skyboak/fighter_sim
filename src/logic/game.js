@@ -12,7 +12,9 @@ function handleMoveSelection(player) {
     // For now, simulate user input with random selection
     // TODO: Replace with actual user interface
     console.log("Pick 2 to discard:", hand.map((move, i) => `${i}: ${move.name}`));
-    
+
+    //let userDiscards = getUserMoveSelection(hand);
+
     // Temporary: random discard for testing (replace with user input)
     const userDiscard1 = Math.floor(Math.random() * hand.length);
     let userDiscard2 = Math.floor(Math.random() * hand.length);

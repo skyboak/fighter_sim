@@ -1,5 +1,5 @@
 import { Move } from "../constants/move"
-import {moves, pinfallMoves} from "../constants/moves";
+import {moves, pinfallMoves, specialMoves} from "../constants/moves";
 
 
 // Function to get a random move card from the deck
@@ -30,5 +30,11 @@ function getPinfall(pinfallDeck){
     return move;
 }
 
+function getSpecialMove(){
+    const randomIndex = Math.floor(Math.random() * specialMoves.length);
+    const move = specialMoves[randomIndex];
+    return move;
+}
 
-export { getPinfall, getMove, getMovesFromDeck };
+
+export { getSpecialMove, getPinfall, getMove, getMovesFromDeck };

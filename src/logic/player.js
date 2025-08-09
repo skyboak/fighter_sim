@@ -1,6 +1,6 @@
 class Player{
     constructor(name, luchadorSkill, dirtySkill, powerhouseSkill, showmanSkill,
-         technicianSkill, brawlerSkill,health = 100, stamina = 100, momentum = 0){
+         technicianSkill, brawlerSkill, health = 100, stamina = 100, momentum = 0, img = null){
             this.name = name;
             this.luchadorSkill = luchadorSkill;
             this.dirtySkill = dirtySkill;
@@ -15,6 +15,8 @@ class Player{
             this.currentPinfall = 0;
             this.deck = [];
             this.pinfallDeck = [];
+            this.img = img;
+            this.discards = [];
         }
     getPlayerSkill(num) {
         const skills = [
@@ -31,8 +33,5 @@ class Player{
 
 
 }
-
-
-
 
 export default Player;

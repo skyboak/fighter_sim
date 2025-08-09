@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Trophy, RotateCcw } from 'lucide-react';
 import wrestlers from './constants/wrestlers';
 import Player from './logic/player';
+import WrestlerSection from './components/wrestlerSection';
+import MoveCard from './components/moveCard';
 
 const GauntletMatch = () => {
   const [currentScreen, setCurrentScreen] = useState('title');
@@ -17,7 +19,7 @@ const GauntletMatch = () => {
   const [defeatedFighters, setDefeatedFighters] = useState([]);
   const [currentFighter, setCurrentFighter] = useState(null);
   const [playerFighter, setPlayerFighter] = useState(null);
-
+  const [selectedDiscards, setSelectedDiscards] = useState([]); 
   const totalSkillPoints = Object.values(skillPoints).reduce((a, b) => a + b, 0);
   const remainingPoints = 8 - totalSkillPoints;
 
@@ -186,19 +188,6 @@ const GauntletMatch = () => {
                 onClick={() => {
                   if (!isDefeated) {
                     setCurrentFighter(fighter);
-                    // Create player fighter if not exists
-                    if (!playerFighter) {
-                      const player = new Player(
-                        fighterName,
-                        skillPoints.luchadorSkill,
-                        skillPoints.dirtySkill,
-                        skillPoints.powerhouseSkill,
-                        skillPoints.showmanSkill,
-                        skillPoints.technicianSkill,
-                        skillPoints.brawlerSkill
-                      );
-                      setPlayerFighter(player);
-                    }
                     setCurrentScreen('match');
                   }
                 }}
@@ -248,45 +237,97 @@ const GauntletMatch = () => {
 
   // Match Screen (Placeholder)
   if (currentScreen === 'match') {
+    // 3bars fighter card, move cards, and buttons for actions vs and the same for opponent.
+
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-900 to-gray-900 flex flex-col items-center justify-center">
-        <h1 className="text-5xl font-bold text-white mb-8">MATCH IN PROGRESS</h1>
-        <div className="bg-gray-800 rounded-lg p-12 shadow-2xl">
-          <div className="text-center mb-8">
-            <p className="text-white text-3xl mb-4">
-              {playerFighter?.name} vs {currentFighter?.name}
-            </p>
-            <div className="text-gray-300 text-lg mb-4">
-              <span className="text-cyan-400">Your Fighter:</span> Custom Build vs{' '}
-              <span className="text-red-400">Opponent:</span> {currentFighter ? getFighterSpecialty(currentFighter) : 'Unknown'}
-            </div>
-            <p className="text-gray-300 text-xl mb-8">Battle System Goes Here</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-800 to-slate-900 flex flex-col items-center justify-center px-8">
+        <div className="flex items-center justify-center gap-12 mb-8">
+          <div>
+            <WrestlerSection fighter={playerFighter} />
           </div>
-          <div className="flex gap-4">
-            <button
-              onClick={() => {
-                // Simulate winning - add the current fighter index
-                const fighterIndex = wrestlers.findIndex(w => w.name === currentFighter.name);
-                if (fighterIndex !== -1) {
-                  setDefeatedFighters(prev => [...prev, fighterIndex]);
-                }
-                setCurrentScreen('selectFighter');
-              }}
-              className="px-8 py-4 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600"
-            >
-              Win Match
-            </button>
-            <button
-              onClick={() => setCurrentScreen('tryAgain')}
-              className="px-8 py-4 bg-red-500 text-white font-bold rounded-lg hover:bg-red-600"
-            >
-              Lose Match
-            </button>
+          <div className="text-5xl font-extrabold text-cyan-400 mx-8 select-none">
+            VS
+          </div>
+          <div>
+            <WrestlerSection fighter={currentFighter} />
+          </div>
+        </div>
+        <div className="w-full max-w-3xl bg-gray-900 rounded-lg p-4 mt-8 shadow-lg">
+          <h2 className="text-xl font-bold text-cyan-300 mb-2">Match Log</h2>
+          <div className="h-40 overflow-y-auto bg-gray-800 rounded p-2 text-white text-sm font-mono">
+            {/* TODO: Render match log entries here */}
+            <div className="text-gray-500 italic">No actions yet.</div>
           </div>
         </div>
       </div>
     );
   }
+
+  // Discard Screen
+  if (currentScreen === 'cardSelect') {
+    // need to show 4 cards that were drawn from the deck. user can select one to keep and discard the rest.
+
+    // Example placeholders for drawn cards and pinfall card
+    // Replace with your actual logic/data
+    const drawnCards = playerFighter?.hand?.slice(0, 3) || [];
+    const pinfallCard = playerFighter?.pinfallDeck?.[0] || null;
+
+    
+
+    const handleToggleDiscard = (idx) => {
+      if (selectedDiscards.includes(idx)) {
+        setSelectedDiscards(selectedDiscards.filter(i => i !== idx));
+      } else if (selectedDiscards.length < 2) {
+        setSelectedDiscards([...selectedDiscards, idx]);
+      }
+    };
+
+    const handleConfirm = () => {
+      if (selectedDiscards.length === 2) {
+        // Implement your discard logic here
+        // Example: remove selected cards from hand, keep the rest
+        // ...
+      }
+    };
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-800 to-slate-900 flex flex-col items-center justify-center px-8">
+        <h1 className="text-3xl font-bold text-white mb-8">Select 2 cards to discard</h1>
+        <div className="flex gap-6 mb-8">
+          {drawnCards.map((move, idx) => (
+            <div
+              key={idx}
+              className={`transition-all ${selectedDiscards.includes(idx) ? 'ring-4 ring-red-500 scale-105' : 'ring-2 ring-transparent'} rounded-lg cursor-pointer`}
+              onClick={() => handleToggleDiscard(idx)}
+            >
+              <MoveCard move={move} />
+              <div className="text-center mt-2 text-sm text-white">
+                {selectedDiscards.includes(idx) ? "Discarding" : ""}
+              </div>
+            </div>
+          ))}
+          <div>
+            <MoveCard move={pinfallCard} />
+            <div className="text-center mt-2 text-xs text-cyan-300 font-bold">Pinfall</div>
+          </div>
+        </div>
+        <button
+          className={`px-8 py-3 rounded-lg text-xl font-bold transition-all ${
+            selectedDiscards.length === 2
+              ? 'bg-cyan-400 text-gray-900 hover:bg-cyan-300'
+              : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+          }`}
+          disabled={selectedDiscards.length !== 2}
+          onClick={handleConfirm}
+        >
+          Confirm Discards
+        </button>
+      </div>
+    );
+  }
+
+
+
 
   // Try Again Screen
   if (currentScreen === 'tryAgain') {
@@ -338,6 +379,10 @@ const GauntletMatch = () => {
       </div>
     );
   }
+
+
+  
+
 
   return null;
 };

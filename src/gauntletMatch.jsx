@@ -1,9 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { X, Trophy, RotateCcw } from 'lucide-react';
 import wrestlers from './constants/wrestlers';
 import Player from './logic/player';
 import WrestlerSection from './components/wrestlerSection';
 import MoveCard from './components/moveCard';
+import { moves, pinfallMoves } from './constants/moves';
+import { 
+  handleMoveSelection, 
+  finalizePlayerHand, 
+  playRound, 
+  restoreStaminaAndHealth, 
+  initializeMatch,
+  opponentMoveSelection 
+} from './logic/game';
 
 const GauntletMatch = () => {
   const [currentScreen, setCurrentScreen] = useState('title');
@@ -19,7 +28,14 @@ const GauntletMatch = () => {
   const [defeatedFighters, setDefeatedFighters] = useState([]);
   const [currentFighter, setCurrentFighter] = useState(null);
   const [playerFighter, setPlayerFighter] = useState(null);
-  const [selectedDiscards, setSelectedDiscards] = useState([]); 
+  const [selectedDiscards, setSelectedDiscards] = useState([]);
+  
+  // Game state
+  const [currentRound, setCurrentRound] = useState(1);
+  const [drawnCards, setDrawnCards] = useState([]);
+  const [matchLog, setMatchLog] = useState([]);
+  const [matchWinner, setMatchWinner] = useState(null);
+  
   const totalSkillPoints = Object.values(skillPoints).reduce((a, b) => a + b, 0);
   const remainingPoints = 8 - totalSkillPoints;
 
@@ -69,6 +85,114 @@ const GauntletMatch = () => {
     setDefeatedFighters([]);
     setCurrentFighter(null);
     setPlayerFighter(null);
+    setCurrentRound(1);
+    setMatchLog([]);
+    setMatchWinner(null);
+  };
+
+  const startMatch = (selectedFighter) => {
+    // Create player fighter from skill points
+    const player = new Player(
+      fighterName,
+      skillPoints.luchadorSkill,
+      skillPoints.dirtySkill,
+      skillPoints.powerhouseSkill,
+      skillPoints.showmanSkill,
+      skillPoints.technicianSkill,
+      skillPoints.brawlerSkill
+    );
+    
+    // Create opponent fighter
+    const opponent = new Player(
+      selectedFighter.name,
+      selectedFighter.luchadorSkill,
+      selectedFighter.dirtySkill,
+      selectedFighter.powerhouseSkill,
+      selectedFighter.showmanSkill,
+      selectedFighter.technicianSkill,
+      selectedFighter.brawlerSkill
+    );
+    
+    setPlayerFighter(player);
+    setCurrentFighter(opponent);
+    
+    // Initialize match
+    initializeMatch(player, opponent, moves);
+    
+    // Start with move selection
+    startRound(player, opponent);
+  };
+
+  const startRound = (player, opponent) => {
+    // Draw cards for player
+    const hand = handleMoveSelection(player);
+    setDrawnCards(hand);
+    setSelectedDiscards([]);
+    
+    // Handle opponent selection automatically
+    opponentMoveSelection(opponent);
+    
+    setCurrentScreen('cardSelect');
+  };
+
+  const handleCardSelection = () => {
+    if (selectedDiscards.length === 2) {
+      // Finalize player hand
+      finalizePlayerHand(playerFighter, drawnCards, selectedDiscards);
+      
+      // Move to combat phase
+      setCurrentScreen('match');
+      
+      // Execute the round
+      setTimeout(() => {
+        executeRound();
+      }, 1000);
+    }
+  };
+
+  const executeRound = () => {
+    const result = playRound(currentRound, playerFighter, currentFighter);
+    
+    // Update match log with events
+    setMatchLog(prev => [...prev, ...result.events]);
+    
+    if (result.winner) {
+      // Match is over
+      setMatchWinner(result.winner);
+      
+      if (result.winner === playerFighter) {
+        // Player won - add to defeated fighters
+        const fighterIndex = wrestlers.findIndex(w => w.name === currentFighter.name);
+        setDefeatedFighters(prev => [...prev, fighterIndex]);
+        
+        setTimeout(() => {
+          setCurrentScreen('selectFighter');
+        }, 3000);
+      } else {
+        // Player lost
+        setTimeout(() => {
+          setCurrentScreen('tryAgain');
+        }, 3000);
+      }
+    } else {
+      // Round complete, restore health/stamina and continue
+      restoreStaminaAndHealth(playerFighter, currentFighter);
+      setCurrentRound(prev => prev + 1);
+      
+      // Check if max rounds reached
+      if (currentRound >= 5) {
+        // Match ends in a draw - player loses by default
+        setMatchWinner(currentFighter);
+        setTimeout(() => {
+          setCurrentScreen('tryAgain');
+        }, 3000);
+      } else {
+        // Start next round
+        setTimeout(() => {
+          startRound(playerFighter, currentFighter);
+        }, 2000);
+      }
+    }
   };
 
   // Title Screen
@@ -187,8 +311,7 @@ const GauntletMatch = () => {
                 key={index}
                 onClick={() => {
                   if (!isDefeated) {
-                    setCurrentFighter(fighter);
-                    setCurrentScreen('match');
+                    startMatch(fighter);
                   }
                 }}
                 disabled={isDefeated}
@@ -235,10 +358,8 @@ const GauntletMatch = () => {
     );
   }
 
-  // Match Screen (Placeholder)
+  // Match Screen
   if (currentScreen === 'match') {
-    // 3bars fighter card, move cards, and buttons for actions vs and the same for opponent.
-
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-800 to-slate-900 flex flex-col items-center justify-center px-8">
         <div className="flex items-center justify-center gap-12 mb-8">
@@ -252,11 +373,45 @@ const GauntletMatch = () => {
             <WrestlerSection fighter={currentFighter} />
           </div>
         </div>
+        
+        {/* Round Info */}
+        <div className="text-white text-2xl mb-4">Round {currentRound || 1}</div>
+        
+        {/* Match Status */}
+        {matchWinner && (
+          <div className="text-4xl font-bold text-cyan-400 mb-4">
+            {matchWinner.name || 'Unknown'} WINS!
+          </div>
+        )}
+        
         <div className="w-full max-w-3xl bg-gray-900 rounded-lg p-4 mt-8 shadow-lg">
           <h2 className="text-xl font-bold text-cyan-300 mb-2">Match Log</h2>
           <div className="h-40 overflow-y-auto bg-gray-800 rounded p-2 text-white text-sm font-mono">
-            {/* TODO: Render match log entries here */}
-            <div className="text-gray-500 italic">No actions yet.</div>
+            {matchLog.length === 0 ? (
+              <div className="text-gray-500 italic">Match in progress...</div>
+            ) : (
+              matchLog.map((event, index) => (
+                <div key={index} className="mb-1">
+                  {event.type === 'move' && !event.failed && (
+                    <span>
+                      {event.attacker || 'Unknown'} uses {event.move || 'Unknown Move'}
+                      {(event.damage || 0) > 0 && ` (${event.damage} damage)`}
+                      {(event.heal || 0) > 0 && ` (+${event.heal} health)`}
+                    </span>
+                  )}
+                  {event.type === 'move' && event.failed && (
+                    <span className="text-yellow-400">
+                      {event.attacker || 'Unknown'} cannot use {event.move || 'Unknown Move'} - {event.reason || 'unknown reason'}
+                    </span>
+                  )}
+                  {event.type === 'pinfall' && (
+                    <span className={event.result?.success ? "text-green-400" : "text-red-400"}>
+                      {event.attacker || 'Unknown'} pinfall attempt: {event.result?.success ? 'SUCCESS!' : `Count ${event.result?.count || 0}`}
+                    </span>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
@@ -265,28 +420,14 @@ const GauntletMatch = () => {
 
   // Discard Screen
   if (currentScreen === 'cardSelect') {
-    // need to show 4 cards that were drawn from the deck. user can select one to keep and discard the rest.
-
-    // Example placeholders for drawn cards and pinfall card
-    // Replace with your actual logic/data
-    const drawnCards = playerFighter?.hand?.slice(0, 3) || [];
-    const pinfallCard = playerFighter?.pinfallDeck?.[0] || null;
-
-    
+    // Show the 3 cards that were drawn from the deck and the pinfall card
+    const pinfallCard = playerFighter?.currentPinfall || null;
 
     const handleToggleDiscard = (idx) => {
       if (selectedDiscards.includes(idx)) {
         setSelectedDiscards(selectedDiscards.filter(i => i !== idx));
       } else if (selectedDiscards.length < 2) {
         setSelectedDiscards([...selectedDiscards, idx]);
-      }
-    };
-
-    const handleConfirm = () => {
-      if (selectedDiscards.length === 2) {
-        // Implement your discard logic here
-        // Example: remove selected cards from hand, keep the rest
-        // ...
       }
     };
 
@@ -302,14 +443,16 @@ const GauntletMatch = () => {
             >
               <MoveCard move={move} />
               <div className="text-center mt-2 text-sm text-white">
-                {selectedDiscards.includes(idx) ? "Discarding" : ""}
+                {selectedDiscards.includes(idx) ? "Discarding" : "Keep"}
               </div>
             </div>
           ))}
-          <div>
-            <MoveCard move={pinfallCard} />
-            <div className="text-center mt-2 text-xs text-cyan-300 font-bold">Pinfall</div>
-          </div>
+          {pinfallCard && (
+            <div>
+              <MoveCard move={pinfallCard} />
+              <div className="text-center mt-2 text-xs text-cyan-300 font-bold">Pinfall (Auto-Keep)</div>
+            </div>
+          )}
         </div>
         <button
           className={`px-8 py-3 rounded-lg text-xl font-bold transition-all ${
@@ -318,7 +461,7 @@ const GauntletMatch = () => {
               : 'bg-gray-700 text-gray-400 cursor-not-allowed'
           }`}
           disabled={selectedDiscards.length !== 2}
-          onClick={handleConfirm}
+          onClick={handleCardSelection}
         >
           Confirm Discards
         </button>

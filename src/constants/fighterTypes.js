@@ -9,10 +9,3 @@ const FighterTypes = {
 
 export default FighterTypes;
 
-
-// •	Luchador
-// •	Dirty Player
-// •	Powerhouse
-// •	Showman
-// •	Technician
-// •	Brawler

@@ -4,36 +4,13 @@ import FighterTypes from "../constants/fighterTypes";
 import Player from "./player";
 import { pinfallMoves } from "../constants/moves";
 
-function handleMoveSelection(player) {
+export function handleMoveSelection(player) {
     // Get 3 moves from deck initially + 1 pinfall
     const hand = getMovesFromDeck(player.deck, 3);
     player.currentPinfall = getPinfall(player.pinfallDeck);
     
-    // For now, simulate user input with random selection
-    // TODO: Replace with actual user interface
-    console.log("Pick 2 to discard:", hand.map((move, i) => `${i}: ${move.name}`));
-
-    //let userDiscards = getUserMoveSelection(hand);
-
-    // Temporary: random discard for testing (replace with user input)
-    const userDiscard1 = Math.floor(Math.random() * hand.length);
-    let userDiscard2 = Math.floor(Math.random() * hand.length);
-    while (userDiscard2 === userDiscard1) {
-        userDiscard2 = Math.floor(Math.random() * hand.length);
-    }
-    
-    // Remove the 2 discarded cards
-    const updatedHand = discard2(hand, userDiscard1, userDiscard2);
-    
-    // Get 2 new moves from deck to replace discarded ones
-    const newMoves = getMovesFromDeck(player.deck, 2);
-    updatedHand.push(...newMoves);
-    
-    // Player should end up with exactly 3 moves + 1 pinfall
-    player.hand = updatedHand;
-    
-    console.log("Final hand:", player.hand.map(move => move.name));
-    console.log("Pinfall:", player.currentPinfall.name);
+    // Return the hand for UI to handle selection
+    return hand;
 }
 
 function discard2(hand, index1, index2) {
@@ -48,87 +25,108 @@ function discard2(hand, index1, index2) {
     return newHand;
 }
 
-function opponentMoveSelection(opp) {
+export function finalizePlayerHand(player, hand, discardIndexes) {
+    // Remove the 2 discarded cards
+    const updatedHand = discard2(hand, discardIndexes[0], discardIndexes[1]);
+    
+    // Get 2 new moves from deck to replace discarded ones
+    const newMoves = getMovesFromDeck(player.deck, 2);
+    updatedHand.push(...newMoves);
+    
+    // Player should end up with exactly 3 moves + 1 pinfall
+    player.hand = updatedHand;
+    
+    // console.log("Final hand:", player.hand.map(move => move.name));
+    // console.log("Pinfall:", player.currentPinfall.name);
+}
+
+export function opponentMoveSelection(opp) {
     const hand = getMovesFromDeck(opp.deck, 3);
     opp.hand = hand;
     opp.currentPinfall = getPinfall(opp.pinfallDeck);
 }
 
 
-function playRound(roundNum, player, opp) {
+export function playRound(roundNum, player, opp) {
+    const events = []; // Track events for UI display
+    
     if (roundNum % 2 === 1) {
         // Odd round: Opponent goes first
-        executeMove(opp, player, opp.hand[0]);
-        executeMove(opp, player, opp.hand[1]);
-        executeMove(player, opp, player.hand[0]);
-        executeMove(player, opp, player.hand[1]);
-        executeMove(opp, player, opp.hand[2]);
+        events.push(executeMove(opp, player, opp.hand[0]));
+        events.push(executeMove(opp, player, opp.hand[1]));
+        events.push(executeMove(player, opp, player.hand[0]));
+        events.push(executeMove(player, opp, player.hand[1]));
+        events.push(executeMove(opp, player, opp.hand[2]));
         
         // Check for opponent special move before pinfall
         if (opp.momentum >= 100) {
-            executeMove(opp, player, getSpecialMove()); // Execute opponent's special move
+            events.push(executeMove(opp, player, getSpecialMove())); // Execute opponent's special move
             opp.momentum = 0; // Deplete momentum bar
         }
         
         // Opponent pinfall attempt
         const oppPinfallResult = attemptPinfall(opp, player, opp.currentPinfall);
-        if (oppPinfallResult.success) return opp; // Opponent wins
+        events.push({ type: 'pinfall', attacker: opp.name, result: oppPinfallResult });
+        if (oppPinfallResult.success) return { winner: opp, events }; // Opponent wins
         
-        executeMove(player, opp, player.hand[2]);
+        events.push(executeMove(player, opp, player.hand[2]));
         
         // Check for player special move before pinfall
         if (player.momentum >= 100) {
-            executeMove(player, opp, getSpecialMove()); // Execute player's special move
+            events.push(executeMove(player, opp, getSpecialMove())); // Execute player's special move
             player.momentum = 0; // Deplete momentum bar
         }
         
         // Player pinfall attempt
         const playerPinfallResult = attemptPinfall(player, opp, player.currentPinfall);
-        if (playerPinfallResult.success) return player; // Player wins
+        events.push({ type: 'pinfall', attacker: player.name, result: playerPinfallResult });
+        if (playerPinfallResult.success) return { winner: player, events }; // Player wins
         
     } else {
         // Even round: Player goes first
-        executeMove(player, opp, player.hand[0]);
-        executeMove(player, opp, player.hand[1]);
-        executeMove(opp, player, opp.hand[0]);
-        executeMove(opp, player, opp.hand[1]);
-        executeMove(player, opp, player.hand[2]);
+        events.push(executeMove(player, opp, player.hand[0]));
+        events.push(executeMove(player, opp, player.hand[1]));
+        events.push(executeMove(opp, player, opp.hand[0]));
+        events.push(executeMove(opp, player, opp.hand[1]));
+        events.push(executeMove(player, opp, player.hand[2]));
         
         // Check for player special move before pinfall
         if (player.momentum >= 100) {
-            executeMove(player, opp, getSpecialMove()); // Execute player's special move
+            events.push(executeMove(player, opp, getSpecialMove())); // Execute player's special move
             player.momentum = 0; // Deplete momentum bar
         }
         
         // Player pinfall attempt
         const playerPinfallResult = attemptPinfall(player, opp, player.currentPinfall);
-        if (playerPinfallResult.success) return player; // Player wins
+        events.push({ type: 'pinfall', attacker: player.name, result: playerPinfallResult });
+        if (playerPinfallResult.success) return { winner: player, events }; // Player wins
         
-        executeMove(opp, player, opp.hand[2]);
+        events.push(executeMove(opp, player, opp.hand[2]));
         
         // Check for opponent special move before pinfall
         if (opp.momentum >= 100) {
-            executeMove(opp, player, getSpecialMove()); // Execute opponent's special move
+            events.push(executeMove(opp, player, getSpecialMove())); // Execute opponent's special move
             opp.momentum = 0; // Deplete momentum bar
         }
         
         // Opponent pinfall attempt
         const oppPinfallResult = attemptPinfall(opp, player, opp.currentPinfall);
-        if (oppPinfallResult.success) return opp; // Opponent wins
+        events.push({ type: 'pinfall', attacker: opp.name, result: oppPinfallResult });
+        if (oppPinfallResult.success) return { winner: opp, events }; // Opponent wins
     }
     
 
-    // Return null if no winner this round
-    return null;
+    // Return events if no winner this round
+    return { winner: null, events };
 }
 
 
 // Executes a single move, checking stamina and applying effects
-function executeMove(attacker, defender, move) {
+export function executeMove(attacker, defender, move) {
 
     if (attacker.stamina < move.baseStaminaCost) {
         console.log(`${attacker.name} doesn't have enough stamina for ${move.name}`);
-        return; // Skip the move Not enough stamina.
+        return { type: 'move', attacker: attacker.name, move: move.name, failed: true, reason: 'insufficient stamina' };
     }
 
     attacker.health = Math.min(attacker.health + move.baseHeal, 100);
@@ -140,11 +138,22 @@ function executeMove(attacker, defender, move) {
 
     attacker.stamina = Math.max(0, Math.min(attacker.stamina - move.baseStaminaCost, 100));
 
-    console.log(move.name);
+    // console.log(move.name);
+    
+    return { 
+        type: 'move', 
+        attacker: attacker.name, 
+        defender: defender.name,
+        move: move.name, 
+        damage: move.baseDamage,
+        heal: move.baseHeal,
+        momentum: momentumGain,
+        failed: false 
+    };
 }
 
 
-function attemptPinfall(attacker, defender, pinfall) {
+export function attemptPinfall(attacker, defender, pinfall) {
     const momentumGain = pinfall.baseMomentum * (1 + (0.1 * attacker.getPlayerSkill(pinfall.type)));
     attacker.momentum = Math.min(attacker.momentum + momentumGain, 100);
     
@@ -172,7 +181,7 @@ function attemptPinfall(attacker, defender, pinfall) {
 
 
 // Restores stamina to both fighters at the end of the round
-function restoreStaminaAndHealth(player, opponent) {
+export function restoreStaminaAndHealth(player, opponent) {
 
     //lucha skill improves stamina regen. showman skill improves health regen.
     player.stamina = Math.min(player.stamina + (player.getPlayerSkill(FighterTypes.LUCHADOR) * 2) + 40, 100);
@@ -182,6 +191,20 @@ function restoreStaminaAndHealth(player, opponent) {
     opponent.health = Math.min(opponent.health + (opponent.getPlayerSkill(FighterTypes.SHOWMAN) * 2) + 10, 100);
 }
 
+export function initializeMatch(player, opponent, deck) {
+    player.deck = [...deck]; // Create a copy of the deck
+    opponent.deck = [...deck]; // Create a copy of the deck
+    player.pinfallDeck = [...pinfallMoves]; // Create a copy
+    opponent.pinfallDeck = [...pinfallMoves]; // Create a copy
+    
+    // Reset fighter stats
+    player.health = 100;
+    player.stamina = 100;
+    player.momentum = 0;
+    opponent.health = 100;
+    opponent.stamina = 100;
+    opponent.momentum = 0;
+}
 
 function startMatch(player, opponent, deck) {
     let roundNum = 1;
@@ -195,10 +218,11 @@ function startMatch(player, opponent, deck) {
     while (!winner && roundNum <= 5) {
         handleMoveSelection(player);
         opponentMoveSelection(opponent);
-        winner = playRound(roundNum, player, opponent);
+        const result = playRound(roundNum, player, opponent);
+        winner = result.winner;
         restoreStaminaAndHealth(player, opponent);
         roundNum++;
     }
-    console.log(`${winner.name} wins the match!`);
+    console.log('${winner.name} wins the match!');
     return winner;
 }

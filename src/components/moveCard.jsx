@@ -1,4 +1,12 @@
 function MoveCard({ move }) {
+    if (!move) {
+        return (
+            <div className="w-40 h-32 bg-gray-900 border-2 border-gray-600 rounded-lg p-3 flex items-center justify-center">
+                <span className="text-gray-500">No Move</span>
+            </div>
+        );
+    }
+
     return (
         <div className="w-40 h-32 bg-gray-900 border-2 border-cyan-400 rounded-lg p-3 flex flex-col justify-between shadow-lg">
             <div className="flex justify-between items-center mb-2">

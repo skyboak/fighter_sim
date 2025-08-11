@@ -1,5 +1,4 @@
-import { Move } from "../constants/move"
-import {moves, pinfallMoves, specialMoves} from "../constants/moves";
+import { specialMoves } from "../constants/moves";
 
 
 // Function to get a random move card from the deck

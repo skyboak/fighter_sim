@@ -1,7 +1,6 @@
 
 import { getMovesFromDeck, getPinfall, getSpecialMove} from "./deck";
-import FighterTypes from "../constants/fighterTypes";
-import Player from "./player";
+import FighterTypes from "../fighterTypes";
 import { pinfallMoves } from "../constants/moves";
 
 export function handleMoveSelection(player) {
@@ -129,14 +128,23 @@ export function executeMove(attacker, defender, move) {
         return { type: 'move', attacker: attacker.name, move: move.name, failed: true, reason: 'insufficient stamina' };
     }
 
-    attacker.health = Math.min(attacker.health + move.baseHeal, 100);
+    // Dynamic caps
+    const atkMaxHealth = attacker.getMaxHealth ? attacker.getMaxHealth() : 100;
+    const atkMaxStamina = attacker.getMaxStamina ? attacker.getMaxStamina() : 100;
 
-    defender.health = Math.max(defender.health - move.baseDamage, 0);
+    // Damage multiplier: base * (1 + 5% per brawlerSkill) when using Brawler moves OR universal? design: damage multiplier from Brawler stat for all offense
+    const brawlerMult = 1 + 0.05 * (attacker.brawlerSkill || 0);
+    const damageDealt = Math.round(move.baseDamage * brawlerMult);
+
+    attacker.health = Math.min(attacker.health + move.baseHeal, atkMaxHealth);
+    defender.health = Math.max(defender.health - damageDealt, 0);
 
     const momentumGain = move.baseMomentum * (1 + (0.1 * attacker.getPlayerSkill(move.type)));
     attacker.momentum = Math.min(attacker.momentum + momentumGain, 100);
 
-    attacker.stamina = Math.max(0, Math.min(attacker.stamina - move.baseStaminaCost, 100));
+    // Negative cost represents a gain (handled by subtraction operation already in original design)
+    const staminaChange = -move.baseStaminaCost; // positive means gain, negative means loss
+    attacker.stamina = Math.max(0, Math.min(attacker.stamina + staminaChange, atkMaxStamina));
 
     // console.log(move.name);
     
@@ -145,37 +153,50 @@ export function executeMove(attacker, defender, move) {
         attacker: attacker.name, 
         defender: defender.name,
         move: move.name, 
-        damage: move.baseDamage,
+    damage: damageDealt,
         heal: move.baseHeal,
-        momentum: momentumGain,
+        momentum: momentumGain, // kept for compatibility
+        momentumGain,
+        staminaChange,
         failed: false 
     };
 }
 
 
 export function attemptPinfall(attacker, defender, pinfall) {
-    const momentumGain = pinfall.baseMomentum * (1 + (0.1 * attacker.getPlayerSkill(pinfall.type)));
-    attacker.momentum = Math.min(attacker.momentum + momentumGain, 100);
-    
+    // Removed momentum gain from pinfall per design change
     const skillBonus = 1 + (0.1 * attacker.getPlayerSkill(pinfall.type));
     const healthFactor = Math.max(0.1, 1 - defender.health / 100); // Lower health = higher chance
-    const baseChance = skillBonus * healthFactor;
-    
-    const count1Chance = Math.min(0.9, baseChance * 0.8);
+
+    // Dirty Player passive: improves pinfall odds regardless of pinfall card type.
+    // Scaling: +5% to overall chance per Dirty skill point (max +40% at 8).
+    // Using getPlayerSkill for consistency with other skill fetches.
+    const dirtySkill = attacker.getPlayerSkill(FighterTypes.DIRTY_PLAYER) || 0;
+    const dirtyFactor = 1 + dirtySkill * 0.05;
+
+    // Low-health / zero-health bonus: up to +0.5 when at 0–20 HP, plus an extra +0.3 if exactly 0.
+    const lowHealthBoost = defender.health <= 20 ? ((20 - defender.health) / 20) * 0.5 : 0; // 0..0.5
+    const zeroHealthBonus = defender.health === 0 ? 0.3 : 0; // explicit extra incentive at 0
+
+    // New base chance slightly higher, additive bonuses applied after multiplicative factors.
+    const baseChance = (skillBonus * healthFactor * dirtyFactor) + lowHealthBoost + zeroHealthBonus;
+
+    // Raised caps & multipliers to make pinfalls slightly easier overall.
+    const count1Chance = Math.min(0.95, baseChance * 0.9);
     if (Math.random() >= count1Chance) {
         return { success: false, count: 0 };
     }
-    
-    const count2Chance = Math.min(0.7, baseChance * 0.6);
+
+    const count2Chance = Math.min(0.8, baseChance * 0.7);
     if (Math.random() >= count2Chance) {
         return { success: false, count: 1 };
     }
-    
-    const count3Chance = Math.min(0.5, baseChance * 0.4);
+
+    const count3Chance = Math.min(0.65, baseChance * 0.55);
     if (Math.random() >= count3Chance) {
         return { success: false, count: 2 };
     }
-    
+
     return { success: true, count: 3 };
 }
 
@@ -184,11 +205,16 @@ export function attemptPinfall(attacker, defender, pinfall) {
 export function restoreStaminaAndHealth(player, opponent) {
 
     //lucha skill improves stamina regen. showman skill improves health regen.
-    player.stamina = Math.min(player.stamina + (player.getPlayerSkill(FighterTypes.LUCHADOR) * 2) + 40, 100);
-    player.health = Math.min(player.health + (player.getPlayerSkill(FighterTypes.SHOWMAN) * 2) + 10, 100);
+    const pMaxStam = player.getMaxStamina ? player.getMaxStamina() : 100;
+    const pMaxHp = player.getMaxHealth ? player.getMaxHealth() : 100;
+    const oMaxStam = opponent.getMaxStamina ? opponent.getMaxStamina() : 100;
+    const oMaxHp = opponent.getMaxHealth ? opponent.getMaxHealth() : 100;
 
-    opponent.stamina = Math.min(opponent.stamina + (opponent.getPlayerSkill(FighterTypes.LUCHADOR) * 2) + 40, 100); 
-    opponent.health = Math.min(opponent.health + (opponent.getPlayerSkill(FighterTypes.SHOWMAN) * 2) + 10, 100);
+    player.stamina = Math.min(player.stamina + (player.getPlayerSkill(FighterTypes.LUCHADOR) * 2) + 40, pMaxStam);
+    player.health = Math.min(player.health + (player.getPlayerSkill(FighterTypes.SHOWMAN) * 2) + 10, pMaxHp);
+
+    opponent.stamina = Math.min(opponent.stamina + (opponent.getPlayerSkill(FighterTypes.LUCHADOR) * 2) + 40, oMaxStam); 
+    opponent.health = Math.min(opponent.health + (opponent.getPlayerSkill(FighterTypes.SHOWMAN) * 2) + 10, oMaxHp);
 }
 
 export function initializeMatch(player, opponent, deck) {
@@ -206,23 +232,4 @@ export function initializeMatch(player, opponent, deck) {
     opponent.momentum = 0;
 }
 
-function startMatch(player, opponent, deck) {
-    let roundNum = 1;
-    let winner = null;
-
-    player.deck = deck;
-    opponent.deck = deck;
-    player.pinfallDeck = pinfallMoves;
-    opponent.pinfallDeck = pinfallMoves;
-
-    while (!winner && roundNum <= 5) {
-        handleMoveSelection(player);
-        opponentMoveSelection(opponent);
-        const result = playRound(roundNum, player, opponent);
-        winner = result.winner;
-        restoreStaminaAndHealth(player, opponent);
-        roundNum++;
-    }
-    console.log('${winner.name} wins the match!');
-    return winner;
-}
+// startMatch function not used in UI flow; removed to clean warnings.

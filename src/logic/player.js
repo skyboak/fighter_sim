@@ -30,6 +30,15 @@ class Player{
         return skills[num];
     }
 
+    // Dynamic maximums influenced by skills (5% per skill point)
+    getMaxHealth() {
+        return 100 * (1 + 0.05 * (this.powerhouseSkill || 0));
+    }
+
+    getMaxStamina() {
+        return 100 * (1 + 0.05 * (this.technicianSkill || 0));
+    }
+
 
 
 }

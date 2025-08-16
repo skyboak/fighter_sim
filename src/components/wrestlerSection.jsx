@@ -11,9 +11,9 @@ function WrestlerSection({ fighter }) {
     <div>
       <FighterCard fighter={fighter} />
       <div>
-        <Bar label="Health" value={fighter.health || 100} color="red" />
-        <Bar label="Stamina" value={fighter.stamina || 100} color="yellow" />
-        <Bar label="Momentum" value={fighter.momentum || 0} color="blue" />
+        <Bar label="Health" value={fighter.health ?? 100} max={fighter.getMaxHealth ? fighter.getMaxHealth() : 100} color="red" />
+        <Bar label="Stamina" value={fighter.stamina ?? 100} max={fighter.getMaxStamina ? fighter.getMaxStamina() : 100} color="yellow" />
+        <Bar label="Momentum" value={fighter.momentum ?? 0} max={100} color="blue" />
       </div>
       <div>
         {(fighter.hand || []).map((move, idx) => (

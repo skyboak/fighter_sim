@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import GenericWrestlerImg from "../assets/genericWrestler.png";
 
 function FighterCard({ fighter }) {
     const [imageError, setImageError] = useState(false);
@@ -29,19 +30,13 @@ function FighterCard({ fighter }) {
 
     return (
         <div className="w-32 h-32 bg-gray-800 border-2 border-cyan-400 rounded-lg flex flex-col items-center justify-center shadow-lg">
-            {imageUrl && !imageError ? (
-                <img
-                    src={imageUrl}
-                    alt={`${fighterName} avatar`}
-                    className="w-20 h-20 rounded-full object-cover mb-2 border-2 border-white"
-                    onError={handleImageError}
-                    onLoad={handleImageLoad}
-                />
-            ) : (
-                <div className="w-20 h-20 rounded-full bg-gray-600 mb-2 border-2 border-white flex items-center justify-center">
-                    <span className="text-white text-xs">No Image</span>
-                </div>
-            )}
+            <img
+                src={!imageUrl || imageError ? GenericWrestlerImg : imageUrl}
+                alt={`${fighterName} avatar`}
+                className="w-20 h-20 rounded-full object-cover mb-2 border-2 border-white"
+                onError={handleImageError}
+                onLoad={handleImageLoad}
+            />
             <span className="text-white font-bold text-sm text-center px-1">
                 {fighterName}
             </span>
